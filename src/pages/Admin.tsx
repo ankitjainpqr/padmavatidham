@@ -4,12 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { CalendarIcon, Upload, X, Loader2, LogOut, User } from "lucide-react";
+import { CalendarIcon, Upload, X, Loader2, LogOut, User, Mail, MessageCircle, Trash2, Save } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -36,9 +37,18 @@ const photoUploadSchema = z.object({
 
 type PhotoUploadForm = z.infer<typeof photoUploadSchema>;
 
+interface ContactInfo {
+  id?: string;
+  whatsapp_number: string;
+  email: string;
+}
+
 const Admin = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [contactInfo, setContactInfo] = useState<ContactInfo>({ whatsapp_number: "", email: "" });
+  const [isLoadingContact, setIsLoadingContact] = useState(true);
+  const [isSavingContact, setIsSavingContact] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -81,6 +91,170 @@ const Admin = () => {
   useEffect(() => {
     register("date");
   }, [register]);
+
+  // Fetch contact info on mount
+  useEffect(() => {
+    const fetchContactInfo = async () => {
+      if (!isSupabaseConfigured()) {
+        setIsLoadingContact(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("contact_info")
+          .select("*")
+          .limit(1)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          throw error;
+        }
+
+        if (data) {
+          setContactInfo({
+            id: data.id,
+            whatsapp_number: data.whatsapp_number || "",
+            email: data.email || "",
+          });
+        }
+      } catch (error: any) {
+        console.error("Error fetching contact info:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load contact information",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingContact(false);
+      }
+    };
+
+    fetchContactInfo();
+  }, [toast]);
+
+  // Handle contact info save/update
+  const handleSaveContactInfo = async () => {
+    setIsSavingContact(true);
+    try {
+      if (!isSupabaseConfigured()) {
+        throw new Error("Supabase is not configured");
+      }
+
+      const { whatsapp_number, email } = contactInfo;
+
+      // Validate email format if provided
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a valid email address",
+          variant: "destructive",
+        });
+        setIsSavingContact(false);
+        return;
+      }
+
+      // Validate WhatsApp number format if provided (basic validation)
+      if (whatsapp_number && !/^[\d\s\+\-\(\)]+$/.test(whatsapp_number)) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter a valid WhatsApp number",
+          variant: "destructive",
+        });
+        setIsSavingContact(false);
+        return;
+      }
+
+      if (contactInfo.id) {
+        // Update existing record
+        const { error } = await supabase
+          .from("contact_info")
+          .update({
+            whatsapp_number: whatsapp_number || null,
+            email: email || null,
+          })
+          .eq("id", contactInfo.id);
+
+        if (error) throw error;
+
+        toast({
+          title: "Success",
+          description: "Contact information updated successfully!",
+        });
+      } else {
+        // Insert new record
+        const { data, error } = await supabase
+          .from("contact_info")
+          .insert({
+            whatsapp_number: whatsapp_number || null,
+            email: email || null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setContactInfo({
+            id: data.id,
+            whatsapp_number: data.whatsapp_number || "",
+            email: data.email || "",
+          });
+        }
+
+        toast({
+          title: "Success",
+          description: "Contact information saved successfully!",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save contact information",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
+
+  // Handle delete contact info
+  const handleDeleteContactInfo = async () => {
+    if (!contactInfo.id) {
+      // If no ID, just clear the form
+      setContactInfo({ whatsapp_number: "", email: "" });
+      return;
+    }
+
+    if (!confirm("Are you sure you want to delete the contact information? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      if (!isSupabaseConfigured()) {
+        throw new Error("Supabase is not configured");
+      }
+
+      const { error } = await supabase
+        .from("contact_info")
+        .delete()
+        .eq("id", contactInfo.id);
+
+      if (error) throw error;
+
+      setContactInfo({ whatsapp_number: "", email: "" });
+      toast({
+        title: "Success",
+        description: "Contact information deleted successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete contact information",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -212,14 +386,22 @@ const Admin = () => {
             </p>
           </div>
         )}
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload Photos</CardTitle>
-            <CardDescription>
-              Add photos with date and occasion information
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        
+        <Tabs defaultValue="photos" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="photos">Upload Photos</TabsTrigger>
+            <TabsTrigger value="contact">Contact Information</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="photos">
+            <Card>
+              <CardHeader>
+                <CardTitle>Upload Photos</CardTitle>
+                <CardDescription>
+                  Add photos with date and occasion information
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               {/* Date Picker */}
               <div className="space-y-2">
@@ -344,6 +526,118 @@ const Admin = () => {
             </form>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="contact">
+            <Card>
+              <CardHeader>
+                <CardTitle>Manage Contact Information</CardTitle>
+                <CardDescription>
+                  Add, update, or delete WhatsApp number and email address displayed on the Contact page
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingContact ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-muted-foreground">Loading contact information...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* WhatsApp Number */}
+                    <div className="space-y-2">
+                      <Label htmlFor="whatsapp">WhatsApp Number</Label>
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="whatsapp"
+                          placeholder="e.g., +1234567890"
+                          value={contactInfo.whatsapp_number}
+                          onChange={(e) =>
+                            setContactInfo({ ...contactInfo, whatsapp_number: e.target.value })
+                          }
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Enter the WhatsApp number with country code (e.g., +91 for India)
+                      </p>
+                    </div>
+
+                    {/* Email Address */}
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email Address</Label>
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="e.g., contact@example.com"
+                          value={contactInfo.email}
+                          onChange={(e) =>
+                            setContactInfo({ ...contactInfo, email: e.target.value })
+                          }
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Enter a valid email address
+                      </p>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-4">
+                      <Button
+                        onClick={handleSaveContactInfo}
+                        disabled={isSavingContact}
+                        className="flex-1"
+                      >
+                        {isSavingContact ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            {contactInfo.id ? "Update" : "Save"}
+                          </>
+                        )}
+                      </Button>
+                      {(contactInfo.whatsapp_number || contactInfo.email || contactInfo.id) && (
+                        <Button
+                          onClick={handleDeleteContactInfo}
+                          variant="destructive"
+                          disabled={isSavingContact}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Current Info Display */}
+                    {(contactInfo.whatsapp_number || contactInfo.email) && (
+                      <div className="mt-6 p-4 bg-muted rounded-lg">
+                        <p className="text-sm font-medium mb-2">Current Contact Information:</p>
+                        <div className="space-y-1 text-sm">
+                          {contactInfo.whatsapp_number && (
+                            <p>
+                              <span className="font-medium">WhatsApp:</span> {contactInfo.whatsapp_number}
+                            </p>
+                          )}
+                          {contactInfo.email && (
+                            <p>
+                              <span className="font-medium">Email:</span> {contactInfo.email}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
