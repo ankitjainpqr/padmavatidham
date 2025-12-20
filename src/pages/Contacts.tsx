@@ -7,7 +7,9 @@ const Contacts = () => {
   // Replace these with your actual contact information
   const whatsappNumber = "+1234567890"; // Replace with actual WhatsApp number
   const emailAddress = "contact@templevista.com"; // Replace with actual email
-  const mapEmbedUrl = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3022.184133234644!2d-73.98811768459418!3d40.75889597932681!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c25855c6480299%3A0x55194ec5a1ae072e!2sTimes%20Square!5e0!3m2!1sen!2sus!4v1234567890123!5m2!1sen!2sus"; // Replace with your actual location embed URL
+  // Google Maps embed URL for माँ पद्मावती जैन साधु वृत्ति आश्रम खेकड़ा शहर
+  // Location: V79R+H4X, Khekra, Uttar Pradesh 250101
+  const mapEmbedUrl = "https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d27951.899233390213!2d77.2522448!3d28.8689927!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390c56831197ca7f%3A0xa93ee65ecfce7264!2z4KSu4KS-4KSBIOCkquCkpuCljeCkruCkvuCkteCkpOClgCDgpJzgpYjgpKgg4KS44KS-4KSn4KWBIOCkteClg-CkpOCljeCkpOCkvyDgpIbgpLbgpY3gpLDgpK4g4KSW4KWH4KSV4KSh4KS84KS-IOCktuCkueCksA!5e0!3m2!1sen!2sin!4v1766226564648!5m2!1sen!2sin";
 
   const handleWhatsAppClick = () => {
     const message = encodeURIComponent("Hello! I would like to get in touch.");
