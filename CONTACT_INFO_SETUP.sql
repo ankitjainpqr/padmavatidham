@@ -48,3 +48,6 @@ CREATE TRIGGER update_contact_info_timestamp
   BEFORE UPDATE ON contact_info
   FOR EACH ROW
   EXECUTE FUNCTION update_contact_info_updated_at();
+
+
+

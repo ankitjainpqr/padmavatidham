@@ -35,3 +35,6 @@ if (isSupabaseConfigured()) {
 }
 
 export { supabase };
+
+
+
