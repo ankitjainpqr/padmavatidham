@@ -76,12 +76,12 @@ const Index = () => {
       <section className="bg-gradient-temple py-16 text-center">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="text-4xl md:text-6xl font-bold text-primary-foreground mb-6 leading-tight">
-            Sacred Temples of India
+            भारत के पवित्र मंदिर
           </h1>
           <p className="text-xl md:text-2xl text-primary-foreground/90 leading-relaxed">
-            Discover the spiritual magnificence and architectural wonders of India's most revered temples. 
-            Each sacred space tells a story of devotion, artistry, and timeless tradition that has inspired 
-            generations of pilgrims and visitors.
+            भारत के सबसे पूजनीय मंदिरों की आध्यात्मिक भव्यता और वास्तुकला के चमत्कारों की खोज करें। 
+            प्रत्येक पवित्र स्थान भक्ति, कला और कालातीत परंपरा की कहानी कहता है जिसने 
+            तीर्थयात्रियों और आगंतुकों की पीढ़ियों को प्रेरित किया है।
           </p>
         </div>
       </section>
@@ -91,19 +91,20 @@ const Index = () => {
         {/* Temple Introduction */}
         <section className="mb-16 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-8">
-            A Journey Through Sacred Architecture
+            पवित्र वास्तुकला की यात्रा
           </h2>
           <div className="max-w-4xl mx-auto">
             <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-              Indian temples represent more than mere structures of stone and marble—they are living embodiments 
-              of spiritual devotion, architectural genius, and cultural heritage. From the golden spires that pierce 
-              the sky to the intricate carvings that tell ancient stories, each temple is a testament to the 
-              profound connection between the divine and the artistic.
+              भारतीय मंदिर पत्थर और संगमरमर की मात्र संरचनाओं से कहीं अधिक हैं—वे आध्यात्मिक भक्ति, 
+              वास्तुकला की प्रतिभा और सांस्कृतिक विरासत के जीवंत अवतार हैं। आकाश को छूने वाली सुनहरी 
+              मीनारों से लेकर प्राचीन कहानियों को बताने वाली जटिल नक्काशी तक, प्रत्येक मंदिर दिव्य और 
+              कलात्मक के बीच गहरे संबंध का प्रमाण है।
             </p>
             <p className="text-lg text-muted-foreground leading-relaxed">
-              These sacred spaces have served as centers of worship, learning, and community for millennia. 
-              They showcase diverse architectural styles from different regions and periods, reflecting the 
-              rich tapestry of Indian civilization and the enduring power of faith to inspire magnificent creation.
+              ये पवित्र स्थान सहस्राब्दियों से पूजा, शिक्षा और समुदाय के केंद्र रहे हैं। 
+              वे विभिन्न क्षेत्रों और कालों की विविध वास्तुशिल्प शैलियों को प्रदर्शित करते हैं, 
+              जो भारतीय सभ्यता की समृद्ध बुनावट और शानदार सृजन को प्रेरित करने वाली आस्था की 
+              स्थायी शक्ति को दर्शाते हैं।
             </p>
           </div>
         </section>
@@ -111,7 +112,7 @@ const Index = () => {
         {/* Temple Grid */}
         <section>
           <h2 className="text-3xl font-bold text-foreground mb-12 text-center">
-            Explore Sacred Destinations
+            पवित्र स्थलों का अन्वेषण करें
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {temples.map((temple, index) => (
