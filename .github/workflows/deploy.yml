@@ -34,20 +34,21 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Add cache-busting headers
+      - name: Add cache-busting to HTML
         run: |
           # Create .nojekyll to ensure proper deployment
           touch dist/.nojekyll
-          # Add cache-control headers via _headers file (for services that support it)
-          echo "/*" > dist/_headers
-          echo "  Cache-Control: no-cache, no-store, must-revalidate" >> dist/_headers
-          echo "  Pragma: no-cache" >> dist/_headers
-          echo "  Expires: 0" >> dist/_headers
-          echo "" >> dist/_headers
-          echo "/index.html" >> dist/_headers
-          echo "  Cache-Control: no-cache, no-store, must-revalidate" >> dist/_headers
-          echo "  Pragma: no-cache" >> dist/_headers
-          echo "  Expires: 0" >> dist/_headers
+          # Add build timestamp and version to HTML files for cache busting
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          BUILD_VERSION=$(git rev-parse --short HEAD || echo "dev-$(date +%s)")
+          # Inject cache-busting meta tags into HTML files
+          for file in dist/index.html dist/404.html; do
+            if [ -f "$file" ]; then
+              # Add version and timestamp as meta tags before closing head tag
+              sed -i.bak "s|</head>|  <meta name=\"build-version\" content=\"${BUILD_VERSION}\" />\n  <meta name=\"build-time\" content=\"${BUILD_TIME}\" />\n</head>|" "$file"
+              rm -f "${file}.bak"
+            fi
+          done
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -67,13 +68,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
-      # Purge Cloudflare cache (if using Cloudflare, add secrets in repo settings)
-      - name: Purge Cloudflare Cache
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
-        uses: jakejarvis/cloudflare-purge-action@master
-        env:
-          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          PURGE_URLS: '["https://www.padmavatidham.com"]'
 
