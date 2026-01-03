@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -30,16 +29,58 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Helper function to validate a session
+  const isValidSession = (session: Session | null): boolean => {
+    if (!session) return false;
+    if (!session.user) return false;
+    // Check if session is expired
+    if (session.expires_at && typeof session.expires_at === 'number') {
+      const expiresAt = session.expires_at * 1000; // Convert to milliseconds
+      if (expiresAt < Date.now()) {
+        return false;
+      }
+    }
+    // Check if access_token exists and is not empty
+    if (!session.access_token || session.access_token.trim() === '') {
+      return false;
+    }
+    return true;
+  };
+
   useEffect(() => {
     if (!isSupabaseConfigured()) {
+      // Explicitly clear user and session when Supabase is not configured
+      setSession(null);
+      setUser(null);
       setLoading(false);
       return;
     }
 
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      // Clear session on any error
+      if (error) {
+        console.warn('Error getting session:', error);
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      // Validate session
+      if (!isValidSession(session)) {
+        // Clear invalid session from storage
+        if (session) {
+          supabase.auth.signOut().catch(() => {
+            // Ignore errors when clearing invalid session
+          });
+        }
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session.user ?? null);
+      }
       setLoading(false);
     });
 
@@ -47,8 +88,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      // Validate session on every auth state change
+      if (!isValidSession(session)) {
+        setSession(null);
+        setUser(null);
+      } else {
+        setSession(session);
+        setUser(session.user ?? null);
+      }
       setLoading(false);
     });
 
@@ -85,6 +132,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
 
 
 
