@@ -34,6 +34,21 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Add cache-busting headers
+        run: |
+          # Create .nojekyll to ensure proper deployment
+          touch dist/.nojekyll
+          # Add cache-control headers via _headers file (for services that support it)
+          echo "/*" > dist/_headers
+          echo "  Cache-Control: no-cache, no-store, must-revalidate" >> dist/_headers
+          echo "  Pragma: no-cache" >> dist/_headers
+          echo "  Expires: 0" >> dist/_headers
+          echo "" >> dist/_headers
+          echo "/index.html" >> dist/_headers
+          echo "  Cache-Control: no-cache, no-store, must-revalidate" >> dist/_headers
+          echo "  Pragma: no-cache" >> dist/_headers
+          echo "  Expires: 0" >> dist/_headers
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
@@ -52,4 +67,13 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Purge Cloudflare cache (if using Cloudflare, add secrets in repo settings)
+      - name: Purge Cloudflare Cache
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        uses: jakejarvis/cloudflare-purge-action@master
+        env:
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PURGE_URLS: '["https://www.padmavatidham.com"]'
 
