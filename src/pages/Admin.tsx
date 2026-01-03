@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { CalendarIcon, Upload, X, Loader2, LogOut, User, Mail, MessageCircle, Trash2, Save } from "lucide-react";
+import { CalendarIcon, Upload, X, Loader2, LogOut, User, Mail, MessageCircle, Trash2, Save, Calendar as CalendarIconLucide } from "lucide-react";
 import Navigation from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -43,12 +53,50 @@ interface ContactInfo {
   email: string;
 }
 
+interface Photo {
+  id: string;
+  imageUrl: string;
+  alt: string;
+  photoIndex: number; // Index in the photos array
+}
+
+interface PhotoSection {
+  id: string;
+  date: string;
+  title?: string;
+  photos: Photo[];
+}
+
+interface PhotoSectionDB {
+  id: string;
+  date: string;
+  occasion: string | null;
+  photos: Array<{
+    image_url: string;
+    alt: string;
+  }>;
+}
+
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
 const Admin = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [contactInfo, setContactInfo] = useState<ContactInfo>({ whatsapp_number: "", email: "" });
   const [isLoadingContact, setIsLoadingContact] = useState(true);
   const [isSavingContact, setIsSavingContact] = useState(false);
+  const [photoSections, setPhotoSections] = useState<PhotoSection[]>([]);
+  const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [photoToDelete, setPhotoToDelete] = useState<{ sectionId: string; photoIndex: number } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
@@ -132,6 +180,118 @@ const Admin = () => {
 
     fetchContactInfo();
   }, [toast]);
+
+  // Fetch photos for manage photos tab
+  const fetchPhotos = async () => {
+    setIsLoadingPhotos(true);
+    if (!isSupabaseConfigured()) {
+      setIsLoadingPhotos(false);
+      return;
+    }
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("photo_sections")
+        .select("*")
+        .order("date", { ascending: false });
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (data) {
+        const sections: PhotoSection[] = data.map((section: PhotoSectionDB) => ({
+          id: section.id,
+          date: section.date,
+          title: section.occasion || undefined,
+          photos: section.photos.map((photo, index) => ({
+            id: `${section.id}-${index}`,
+            imageUrl: photo.image_url,
+            alt: photo.alt || `Photo ${index + 1}`,
+            photoIndex: index,
+          })),
+        }));
+        setPhotoSections(sections);
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to load photos",
+        variant: "destructive",
+      });
+      console.error("Error fetching photos:", err);
+    } finally {
+      setIsLoadingPhotos(false);
+    }
+  };
+
+  // Handle photo delete
+  const handleDeletePhoto = async () => {
+    if (!photoToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      if (!isSupabaseConfigured()) {
+        throw new Error("Supabase is not configured");
+      }
+
+      const { sectionId, photoIndex } = photoToDelete;
+      const section = photoSections.find((s) => s.id === sectionId);
+
+      if (!section) {
+        throw new Error("Photo section not found");
+      }
+
+      // Remove the photo from the array
+      const updatedPhotos = section.photos
+        .filter((_, index) => index !== photoIndex)
+        .map((photo) => ({
+          image_url: photo.imageUrl,
+          alt: photo.alt,
+        }));
+
+      // If no photos left, delete the entire section
+      if (updatedPhotos.length === 0) {
+        const { error: deleteError } = await supabase
+          .from("photo_sections")
+          .delete()
+          .eq("id", sectionId);
+
+        if (deleteError) throw deleteError;
+
+        toast({
+          title: "Success",
+          description: "Photo section deleted successfully!",
+        });
+      } else {
+        // Update the section with remaining photos
+        const { error: updateError } = await supabase
+          .from("photo_sections")
+          .update({ photos: updatedPhotos })
+          .eq("id", sectionId);
+
+        if (updateError) throw updateError;
+
+        toast({
+          title: "Success",
+          description: "Photo deleted successfully!",
+        });
+      }
+
+      // Refresh the photos list
+      await fetchPhotos();
+      setDeleteDialogOpen(false);
+      setPhotoToDelete(null);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete photo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Handle contact info save/update
   const handleSaveContactInfo = async () => {
@@ -321,6 +481,11 @@ const Admin = () => {
       setValue("date", undefined as any);
       setValue("occasion", "");
       setValue("photos", []);
+
+      // Refresh photos list if manage photos tab is active
+      if (photoSections.length > 0) {
+        await fetchPhotos();
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -388,8 +553,9 @@ const Admin = () => {
         )}
         
         <Tabs defaultValue="photos" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="photos">Upload Photos</TabsTrigger>
+            <TabsTrigger value="manage" onClick={fetchPhotos}>Manage Photos</TabsTrigger>
             <TabsTrigger value="contact">Contact Information</TabsTrigger>
           </TabsList>
 
@@ -528,6 +694,87 @@ const Admin = () => {
         </Card>
           </TabsContent>
 
+          <TabsContent value="manage">
+            <Card>
+              <CardHeader>
+                <CardTitle>Manage Photos</CardTitle>
+                <CardDescription>
+                  View and delete photos from the gallery
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingPhotos ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+                    <span className="text-muted-foreground">Loading photos...</span>
+                  </div>
+                ) : photoSections.length === 0 ? (
+                  <div className="text-center py-16">
+                    <p className="text-muted-foreground text-lg">No photos available yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-16">
+                    {photoSections.map((section) => (
+                      <section key={section.id} className="space-y-6">
+                        {/* Date Header */}
+                        <div className="flex items-center gap-4 pb-4 border-b border-border">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-lg">
+                              <CalendarIconLucide className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <h2 className="text-2xl md:text-3xl font-bold text-foreground">
+                                {formatDate(section.date)}
+                              </h2>
+                              {section.title && (
+                                <p className="text-lg text-primary font-semibold mt-1">
+                                  {section.title}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Photo Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                          {section.photos.map((photo) => (
+                            <Card
+                              key={photo.id}
+                              className="group relative overflow-hidden shadow-warm hover:shadow-temple transition-all duration-300 transform hover:-translate-y-1 bg-card border-border"
+                            >
+                              <div className="aspect-square overflow-hidden">
+                                <img
+                                  src={photo.imageUrl}
+                                  alt={photo.alt}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                              </div>
+                              {/* Delete Button */}
+                              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    setPhotoToDelete({ sectionId: section.id, photoIndex: photo.photoIndex });
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="contact">
             <Card>
               <CardHeader>
@@ -639,11 +886,43 @@ const Admin = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Photo</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this photo? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePhoto}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
 
 export default Admin;
+
+
+
 
 
 
