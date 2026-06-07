@@ -12,6 +12,7 @@ import Photos from "./pages/Photos";
 import Admin from "./pages/Admin";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import SanghParichay from "./pages/SanghParichay";
 
 const queryClient = new QueryClient();
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/about-us" element={<AboutUs />} />
             <Route path="/contacts" element={<Contacts />} />
             <Route path="/photos" element={<Photos />} />
+            <Route path="/sangh-parichay" element={<SanghParichay />} />
             <Route path="/login" element={<Login />} />
             <Route
               path="/admin"
